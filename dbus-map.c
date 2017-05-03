@@ -216,6 +216,13 @@ int main(int argc, char **argv)
     g_print("%s\t%16s\t%40s\t%32s\n", "PID", "USER", "NAME", "CMDLINE");
 
     while (g_variant_iter_loop(iter, "s", &str)) {
+
+
+        gboolean skip(const gchar* dest, const gchar* ifc);
+        if (skip(str, "")) {
+            continue;
+        }
+
         proc_t  *p = get_name_process(bus, str);
 
         if (p) {

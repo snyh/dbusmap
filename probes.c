@@ -28,41 +28,18 @@ gboolean check_access_method(GDBusConnection *bus, const gchar *dest, const gcha
 
     reply = g_dbus_send(bus, request, G_DBUS_SEND_MESSAGE_FLAGS_NONE, timeout, NULL, NULL, NULL);
 
-    // Sometimes the parameters are not checked.
     if (g_dbus_message_get_message_type(reply) == G_DBUS_MESSAGE_TYPE_METHOD_RETURN) {
         g_object_unref(reply);
         g_object_unref(request);
+        printf("!!%s",method);
         return true;
     }
 
-    g_assert_cmpint(g_dbus_message_get_message_type(reply), ==, G_DBUS_MESSAGE_TYPE_ERROR);
 
-    type = strdupa(g_dbus_message_get_error_name(reply));
-
+    gboolean v = check_access_by_reply(reply);
     g_object_unref(reply);
     g_object_unref(request);
-
-    if (g_strcmp0(type, "org.freedesktop.DBus.Error.InvalidArgs") == 0)
-        return true;
-    if (g_strcmp0(type, "org.freedesktop.DBus.Error.AccessDenied") == 0)
-        return false;
-    if (g_strcmp0(type, "org.freedesktop.DBus.Python.TypeError") == 0)
-        return true;
-    if (g_strcmp0(type, "org.freedesktop.DBus.Error.UnknownMethod") == 0)
-        return true;
-    if (g_strcmp0(type, "org.freedesktop.DBus.Python.dbus.exceptions.DBusException") == 0)
-        return true;
-    if (g_strcmp0(type, "org.freedesktop.PolicyKit.Error.NotAuthorized") == 0)
-        return true;
-    if (g_strcmp0(type, "org.freedesktop.DBus.Python.ValueError") == 0)
-        return true;
-    if (g_strstr_len(type, -1, "PolKit.NotAuthorizedException"))
-        return false;
-    if (g_strstr_len(type, -1, "authorization_2derror"))
-        return false;
-
-    g_debug("unknown method error string received `%s`", type);
-    return true;
+    return v;
 }
 
 gboolean check_name_protected(GDBusConnection *bus, const gchar *name)
@@ -84,7 +61,7 @@ gboolean check_name_protected(GDBusConnection *bus, const gchar *name)
     if (g_dbus_message_get_message_type(reply) == G_DBUS_MESSAGE_TYPE_METHOD_RETURN) {
         g_object_unref(reply);
         g_object_unref(request);
-        return false;
+        return true;
     }
 
     g_assert_cmpint(g_dbus_message_get_message_type(reply), ==, G_DBUS_MESSAGE_TYPE_ERROR);
@@ -149,33 +126,16 @@ gboolean check_access_property(GDBusConnection *bus, const gchar *dest, const gc
 
     if (g_dbus_message_get_message_type(reply) == G_DBUS_MESSAGE_TYPE_ERROR) {
 
+
         type = strdupa(g_dbus_message_get_error_name(reply));
+
+        gboolean v = check_access_by_reply(reply);
 
         g_object_unref(reply);
         g_object_unref(request);
         g_variant_unref(body);
 
-        if (g_strcmp0(type, "org.freedesktop.DBus.Error.InvalidArgs") == 0)
-            return true;
-        if (g_strcmp0(type, "org.freedesktop.DBus.Error.AccessDenied") == 0)
-            return false;
-        if (g_strcmp0(type, "org.freedesktop.DBus.Error.PropertyReadOnly") == 0)
-            return false;
-        if (g_strcmp0(type, "org.freedesktop.PolicyKit.Error.NotAuthorized") == 0)
-            return false;
-        if (g_strcmp0(type, "org.freedesktop.DBus.Python.dbus.exceptions.DBusException") == 0)
-            return false;
-        if (g_strcmp0(type, "org.freedesktop.DBus.Error.UnknownMethod") == 0)
-            return false;
-        if (g_strcmp0(type, "org.freedesktop.DBus.Error.NoReply") == 0)
-            return true;
-        if (g_strcmp0(type, "org.freedesktop.DBus.Error.ServiceUnknown") == 0)
-            return true;
-        if (g_strstr_len(type, -1, "authorization_2derror"))
-            return false;
-
-        g_debug("unknown error string received `%s`", type);
-        return true;
+        return v;
     }
 
     g_object_unref(reply);

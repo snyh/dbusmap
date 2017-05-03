@@ -18,9 +18,23 @@ static gchar* dump_property(xmlNodePtr node, const char* prop)
     return ret;
 }
 
+GVariant* build_zero_body(const gchar* sig)
+{
+    if (sig == NULL) return NULL;
+
+    if (g_str_equal(sig, "s")) {
+        return  g_variant_new("(s)","");
+    }
+
+    GVariant* v = g_variant_new(g_strdup_printf("(%s)", sig == NULL ? "" : sig));
+
+    return v;
+}
 
 GVariant* build_invalid_body(const gchar* sig)
 {
+    return build_zero_body(sig);
+
     if (sig == NULL || g_str_equal(sig, "s")) {
         return g_variant_new("(d)", 0);
     } else {
@@ -44,7 +58,7 @@ gchar* get_method_signature(xmlNodePtr node) {
             if (!g_str_equal(s, "out")) {
                 xmlFree(s);
                 return dump_property(cur, "type");
-             }
+            }
             xmlFree(s);
         }
         cur = cur->next;
@@ -95,3 +109,79 @@ GVariant * g_dbus_simple_send(GDBusConnection *bus, GDBusMessage *msg, const gch
     return body;
 }
 
+
+gboolean check_access_by_reply(GDBusMessage* reply) {
+    GError* err = NULL;
+    if (!g_dbus_message_to_gerror(reply, &err)) {
+        return true;
+    }
+    if (g_strrstr(err->message, "auth") && g_strrstr(err->message, "fail")) {
+        g_error_free(err);
+        return false;
+    }
+    printf("ErrorMessage:%s\n",err->message);
+    g_error_free(err);
+
+    // check by reply type
+    const gchar* type = g_dbus_message_get_error_name(reply);
+
+    if (g_strcmp0(type, "org.freedesktop.DBus.Error.InvalidArgs") == 0)
+        return true;
+    if (g_strcmp0(type, "org.freedesktop.DBus.Error.AccessDenied") == 0)
+        return false;
+    if (g_strcmp0(type, "org.freedesktop.DBus.Error.PropertyReadOnly") == 0)
+        return false;
+    if (g_strcmp0(type, "org.freedesktop.DBus.Error.UnknownMethod") == 0)
+        return false;
+    if (g_strcmp0(type, "org.freedesktop.DBus.Error.NoReply") == 0)
+        return true;
+    if (g_strcmp0(type, "org.freedesktop.DBus.Error.ServiceUnknown") == 0)
+        return true;
+
+    if (g_strstr_len(type, -1, "authorization_2derror"))
+        return false;
+
+    if (g_strcmp0(type, "org.freedesktop.DBus.Python.dbus.exceptions.DBusException") == 0)
+        return false;
+    if (g_strcmp0(type, "org.freedesktop.DBus.Python.TypeError") == 0)
+        return true;
+    if (g_strcmp0(type, "org.freedesktop.DBus.Python.ValueError") == 0)
+        return true;
+
+    if (g_strcmp0(type, "org.freedesktop.PolicyKit.Error.NotAuthorized") == 0)
+        return false;
+    if (g_strstr_len(type, -1, "PolKit.NotAuthorizedException"))
+        return false;
+
+    g_debug("unknown method error string received `%s`", type);
+    return true;
+}
+
+
+gboolean skip(const gchar* dest, const gchar* ifc) {
+    if (g_str_equal(ifc, "org.freedesktop.DBus.Introspectable")) {
+        return true;
+    }
+
+    /* if (!g_str_equal(dest, "com.deepin.daemon.Accounts")) { */
+    /*     return true; */
+    /* } */
+
+    if (g_str_has_prefix(dest, ":")) {
+        return true;
+    }
+
+    if (g_str_equal(dest, "org.freedesktop.DBus")) {
+        return true;
+    }
+
+    if (g_str_equal(ifc, "org.freedesktop.DBus.Peer")) {
+        return true;
+    }
+
+    if (g_strrstr(dest, "deepin") ||
+        g_str_equal(dest, "org.freedesktop.DBus")) {
+        return false;
+    }
+    return true;
+}

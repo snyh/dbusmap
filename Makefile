@@ -8,3 +8,8 @@ dbus-map: dbus-map.o polkitagent.o actions.o util.o probes.o introspect.o
 
 clean:
 	rm -f dbus-map core *.o
+
+
+
+test: dbus-map
+	sudo -u nobody ./dbus-map --dump-methods --dump-properties --enable-probes --null-agent --timeout 1000
